@@ -10,7 +10,7 @@
 #include <string>
 #include <cpp/serve/config.h>
 
-using tokenizers::Tokenizer;
+using namespace tokenizers;
 using namespace mlc::llm::serve ;
 
 std::string LoadBytesFromFile(const std::string& path) {
@@ -31,10 +31,11 @@ std::string LoadBytesFromFile(const std::string& path) {
 int main() {
  
   // Read blob from file.
-  auto blob = LoadBytesFromFile("/home/ubuntu/olya/mlc-llm/dist/Meta-Llama-3.1-8B-Instruct/tokenizer.json");
-  // Note: all the current factory APIs takes in-memory blob as input.
-  // This gives some flexibility on how these blobs can be read.
-  auto tok = Tokenizer::FromBlobJSON(blob);
+  auto blob = LoadBytesFromFile("C:\\Users\\sirki\\teher_workspace\\converted_tiny_llama\\tokenizer.json");
+  std::cout << "Starting ..." << std::endl;
+//  // Note: all the current factory APIs takes in-memory blob as input.
+//  // This gives some flexibility on how these blobs can be read.
+auto tok = Tokenizer::FromBlobJSON(blob);
   std::string prompt = "What is the capital of Canada?";
   // call Encode to turn prompt into token ids
   std::vector<int> input_tokens = tok->Encode(prompt);
@@ -42,14 +43,14 @@ int main() {
 
   // Read and parse the JSON file
   //const String& model_str  = 
-  tvm::runtime::String model_str = "/home/ubuntu/olya/mlc-llm/dist/Meta-Llama-3.1-8B-Instruct";
-  picojson::object model_config = mlc::llm::serve::Model::LoadModelConfig(model_str).Unwrap();
+  tvm::runtime::String model_str = "C:\\Users\\sirki\\teher_workspace\\converted_tiny_llama";
+  picojson::object model_config = Model::LoadModelConfig(model_str).Unwrap();
      
   mlc::llm::serve::Model model = mlc::llm::serve::Model::Create(
-    "/home/ubuntu/olya/mlc-llm/dist/libs/Meta-Llama-3.1-8B-Instruct-vulkan.so",
-    "/home/ubuntu/olya/mlc-llm/dist/Meta-Llama-3.1-8B-Instruct",
+    "C:\\Users\\sirki\\teher_workspace\\tiny_llama_vulkan_win.so",
+    "C:\\Users\\sirki\\teher_workspace\\converted_tiny_llama",
     model_config,
-    DLDevice{kDLCPU, 7},
+    DLDevice{kDLVulkan, 0},
     {},
     1,
     1,
@@ -101,28 +102,29 @@ std::cout << "Created logits processor" << std::endl;
 
     // - Compute probability distributions.
     NDArray probs_on_device =
-        logit_processor->ComputeProbsFromLogits(logits, {generation_cfg}, {});
+        logit_processor->ComputeProbsFromLogits(logits, {generation_cfg}, {"0"});
 
     // - Sample tokens.
     // Fill range [0, num_rsentries) into `sample_indices`.
     std::vector<int> sample_indices(num_rsentries);
     std::iota(sample_indices.begin(), sample_indices.end(), 0);
     NDArray renormalized_probs = sampler->BatchRenormalizeProbsByTopP(
-        probs_on_device, sample_indices, {}, {generation_cfg});
+        probs_on_device, sample_indices, {"0"}, {generation_cfg});
     std::vector<SampleResult> sample_results = sampler->BatchSampleTokensWithProbAfterTopP(
-        renormalized_probs, sample_indices, {}, {generation_cfg}, {});
-   
+        renormalized_probs, sample_indices, { "0" }, { generation_cfg }, { {} });
 
-//     // - Update the committed tokens of states.
-//     for (int i = 0; i < num_rsentries; ++i) {
-//       mstates[i]->CommitToken(sample_results[i]);
-//       // Metrics update
-//       // live update the output metrics
-//       running_rsentries[i]->rstate->metrics.completion_tokens += 1;
-//     }
+    
+    std::vector<int32_t> token_ids;
+    
+    for (const SampleResult& token : sample_results) {
 
-// // call Decode to turn ids into string
-//   std::string decoded_prompt = tok->Decode(ids);
+        int32_t curr_id = token.sampled_token_id.first;
+        token_ids.push_back(curr_id);
+    }
+
+ //call Decode to turn ids into string
+  std::string decoded_prompt = tok->Decode(token_ids);
+ 
   
 
   return 0;

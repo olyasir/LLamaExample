@@ -5,21 +5,42 @@
 #include <vector>
 #include <tvm/runtime/device_api.h>
 #include <tvm/runtime/module.h>
-#include <tvm/runtime/registry.h>
+#include <cpp/serve/config.h>
+#include <cpp/serve/request.h>
+#include <cpp/serve/engine.h>
+
+using namespace mlc::llm;
+using namespace mlc::llm::serve;
 
 class LlamaModel {
 public:
     // Constructor
     LlamaModel();
 
-    // Load model weights from a file
+    //// Load model weights from a file
     bool LoadWeights(const std::string& weights_file);
 
     // Process input and generate output
-    std::vector<float> Process(const std::vector<float>& input);
+    std::string LlamaModel::Process(const std::string prompt);
 
-protected:
-  tvm::runtime::Module lib_;
+
+
+
+private:
+    std::unique_ptr<Engine> _engine = nullptr;
+    GenerationConfig _generation_config;
+   
+
+    Engine* GetEngine() {
+        if (_engine == nullptr) {
+            std::cerr << "Engine is not initialized via init\n";
+            assert(false);
+            
+        }
+        return _engine.get();
+    }
+
+    
   
 };
 
