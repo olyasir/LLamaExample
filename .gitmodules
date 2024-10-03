@@ -1,0 +1,4 @@
+[submodule "mlc-llm"]
+	path = mlc-llm
+	url = https://github.com/tetherto/mlc-llm.git
+	branch = base/v1
