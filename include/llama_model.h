@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 #include <tvm/runtime/device_api.h>
-#pragma once
-
 #include <tvm/runtime/module.h>
 #include <cpp/serve/config.h>
 #include <cpp/serve/request.h>
@@ -16,18 +14,31 @@ using namespace mlc::llm::serve;
 
 class LlamaModel {
 public:
-    // Constructor
-    LlamaModel();
+    /**
+     * Constructor for llama model
+     *
+     * @param model_path - path to a model directory that includes the weight shards and mlc-chat-config.json.
+     * @param model_lib path to .so model file.
+     */
+    LlamaModel(String model_path, String model_lib);
 
     //// Load model weights from a file
     bool LoadWeights(const std::string& weights_file);
 
-    // Process input and generate output
+    /**
+     * The chat method, it reserves in input string and generated a reply.
+     *
+     * @param prompt - user request from the model in natural language.
+     * @return a replay from the model
+     */
     std::string Process(const std::string prompt);
 
 private:
     std::unique_ptr<Engine> _engine = nullptr;
     GenerationConfig _generation_config;
+    Tokenizer tokenizer;
+    TextStreamer streamer;
+    std::string _model_path;
    
 
     Engine* GetEngine() {

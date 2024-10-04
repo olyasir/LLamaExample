@@ -14,25 +14,28 @@
 using namespace mlc::llm;
 using namespace mlc::llm::serve;
 
+void  callback_func(Array<RequestStreamOutput> out){}
 
-
-
-Tokenizer tokenizer;
-TextStreamer streamer;
-
-
-
-void  callback_func(Array<RequestStreamOutput> out)
+std::string  get_engine_config(String model_path, String model_lib)
 {
-    
-    for (const auto& delta_output : out) {    
-    }
+    std::string engine_config = "{\"model\" : \"" + model_path+"\"";
+    engine_config = engine_config+ ", \"model_lib\" : \""+model_lib+"\"";
+    engine_config += ", \"additional_models\" : [] , \"mode\" : \"interactive\", \"tensor_parallel_shards\" : null,\
+                        \"pipeline_parallel_stages\" : null, \"gpu_memory_utilization\" : null,\
+                         \"kv_cache_page_size\" : 16, \"max_num_sequence\" : null, \"max_total_sequence_length\" : null,\
+                         \"max_single_sequence_length\" : null, \"prefill_chunk_size\" : null, \"sliding_window_size\" : null,\
+                         \"attention_sink_size\" : null, \"max_history_size\" : null, \"kv_state_kind\" : null,\
+                         \"speculative_mode\" : \"disable\", \"spec_draft_length\" : 0, \"spec_tree_width\" : 1,\
+                         \"prefix_cache_mode\" : \"radix\", \"prefix_cache_max_num_recycling_seqs\" : null,\
+                         \"prefill_mode\" : \"hybrid\", \"verbose\" : false}";
+    return engine_config;
 }
 
- LlamaModel::LlamaModel() { 
 
-     String engine_config = "{\"model\": \"C:\\\\Users\\\\sirki\\\\teher_workspace\\\\converted_tiny_llama\", \"model_lib\" : \"C:\\\\Users\\\\sirki\\\\teher_workspace\\\\tiny_llama_vulkan_win.so\", \"additional_models\" : [] , \"mode\" : \"interactive\", \"tensor_parallel_shards\" : null, \"pipeline_parallel_stages\" : null, \"gpu_memory_utilization\" : null, \"kv_cache_page_size\" : 16, \"max_num_sequence\" : null, \"max_total_sequence_length\" : null, \"max_single_sequence_length\" : null, \"prefill_chunk_size\" : null, \"sliding_window_size\" : null, \"attention_sink_size\" : null, \"max_history_size\" : null, \"kv_state_kind\" : null, \"speculative_mode\" : \"disable\", \"spec_draft_length\" : 0, \"spec_tree_width\" : 1, \"prefix_cache_mode\" : \"radix\", \"prefix_cache_max_num_recycling_seqs\" : null, \"prefill_mode\" : \"hybrid\", \"verbose\" : true}";
-     tokenizer = Tokenizer::FromPath("C:\\Users\\sirki\\teher_workspace\\converted_tiny_llama");
+ LlamaModel::LlamaModel(String model_path, String model_lib ) {
+     std::string engine_config = get_engine_config(model_path, model_lib);
+     //std::string good_conf =  "{\"model\": \"C:\\\\Users\\\\sirki\\\\teher_workspace\\\\converted_tiny_llama\", \"model_lib\" : \"C:\\\\Users\\\\sirki\\\\teher_workspace\\\\tiny_llama_vulkan_win.so\", \"additional_models\" : [] , \"mode\" : \"interactive\", \"tensor_parallel_shards\" : null, \"pipeline_parallel_stages\" : null, \"gpu_memory_utilization\" : null, \"kv_cache_page_size\" : 16, \"max_num_sequence\" : null, \"max_total_sequence_length\" : null, \"max_single_sequence_length\" : null, \"prefill_chunk_size\" : null, \"sliding_window_size\" : null, \"attention_sink_size\" : null, \"max_history_size\" : null, \"kv_state_kind\" : null, \"speculative_mode\" : \"disable\", \"spec_draft_length\" : 0, \"spec_tree_width\" : 1, \"prefix_cache_mode\" : \"radix\", \"prefix_cache_max_num_recycling_seqs\" : null, \"prefill_mode\" : \"hybrid\", \"verbose\" : true}";
+     tokenizer = Tokenizer::FromPath(model_path);
      streamer = TextStreamer(tokenizer);
      Result<EngineCreationOutput> output_res = Engine::Create(
          engine_config, tvm::Device{ static_cast<DLDeviceType>(kDLVulkan), 0 },
@@ -40,6 +43,7 @@ void  callback_func(Array<RequestStreamOutput> out)
      EngineCreationOutput output = output_res.Unwrap(); 
      _generation_config  = output.default_generation_cfg;
      _engine = std::move(output.reloaded_engine);   
+     _model_path = model_path;
  }
 
  bool LlamaModel::LoadWeights(const std::string& weights_file) {
@@ -83,32 +87,29 @@ void  callback_func(Array<RequestStreamOutput> out)
                          std::cout << "finish reason: " << val;
                      }
                  }
-
              }
              };
-
          // Override callback in the engine
          GetEngine()->SetRequestStreamCallback(lambda);
-
-         tvm::runtime::String req_id = "012345";
+         tvm::runtime::String req_id = "0";
          auto request_data = TextData::TextData(prompt);
          tvm::runtime::Array<Data> inputs;
          inputs.push_back(request_data);
 
-         std::ifstream myFile("C:\\Users\\sirki\\teher_workspace\\converted_tiny_llama\\mlc-chat-config.json");
+        /* std::ifstream myFile(_model_path+"\\mlc-chat-config.json");
          std::ostringstream tmp;
          tmp << myFile.rdbuf();
          std::string generation_cfg_json_str = tmp.str();
-         auto config_res = json::ParseToJSONObject(generation_cfg_json_str);
+         auto config_res = json::ParseToJSONObject(generation_cfg_json_str);*/
          //GenerationConfig def_model_config = GenerationConfig::GetDefaultFromModelConfig(config_res);
 
 
-         //std::string generation_cfg_json_str = "{\"n\":1,\"temperature\":0.0,\"top_p\":0.0,\"frequency_penalty\":null,\"presence_penalty\":null,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":null,\"stop_token_ids\":[2],\"response_format\":null,\"debug_config\":null}";
+         std::string generation_cfg_json_str = "{\"n\":1,\"temperature\":0.7,\"top_p\":0.95,\"frequency_penalty\":null,\"presence_penalty\":null,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":null,\"stop_token_ids\":[2],\"response_format\":null,\"debug_config\":null}";
          //std::string additions_generation_config_str = "{\"n\":1,\"max_tokens\":1024}";
-         //auto additions_generation_config = json::ParseToJSONObject(additions_generation_config_str);
+         auto additions_generation_config = json::ParseToJSONObject(generation_cfg_json_str);
 
 
-         auto combined_config_res = GenerationConfig::FromJSON(config_res, this->_generation_config);
+         auto combined_config_res = GenerationConfig::FromJSON(additions_generation_config, this->_generation_config);
          GenerationConfig g_config = combined_config_res.Unwrap();
 
 
