@@ -19,8 +19,9 @@ public:
      *
      * @param model_path - path to a model directory that includes the weight shards and mlc-chat-config.json.
      * @param model_lib path to .so model file.
+     * @param generation_config_str json string for generation configuration
      */
-    LlamaModel(String model_path, String model_lib);
+    LlamaModel(String model_path, String model_lib, std::string generation_config_str) ;
 
     //// Load model weights from a file
     bool LoadWeights(const std::string& weights_file);
