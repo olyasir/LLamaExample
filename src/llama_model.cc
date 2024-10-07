@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <tvm/runtime/container/string.h>
 
 using namespace mlc::llm;
 using namespace mlc::llm::serve;
@@ -84,7 +85,7 @@ std::string  get_engine_config(String model_path, String model_lib)
                          std::string val = finish_reason.value();
                          output_texts.append(streamer->Finish());
                          finished_generation = true;
-                         std::cout << "finish reason: " << val;
+                         //std::cout << "finish reason: " << val;
                      }
                  }
              }
@@ -92,27 +93,14 @@ std::string  get_engine_config(String model_path, String model_lib)
          // Override callback in the engine
          GetEngine()->SetRequestStreamCallback(lambda);
          tvm::runtime::String req_id = "0";
-         auto request_data = TextData::TextData(prompt);
+         auto request_data = TextData(String(prompt));
          tvm::runtime::Array<Data> inputs;
          inputs.push_back(request_data);
 
-        /* std::ifstream myFile(_model_path+"\\mlc-chat-config.json");
-         std::ostringstream tmp;
-         tmp << myFile.rdbuf();
-         std::string generation_cfg_json_str = tmp.str();
-         auto config_res = json::ParseToJSONObject(generation_cfg_json_str);*/
-         //GenerationConfig def_model_config = GenerationConfig::GetDefaultFromModelConfig(config_res);
-
-
-         std::string generation_cfg_json_str = "{\"n\":1,\"temperature\":0.7,\"top_p\":0.95,\"frequency_penalty\":null,\"presence_penalty\":null,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":null,\"stop_token_ids\":[2],\"response_format\":null,\"debug_config\":null}";
-         //std::string additions_generation_config_str = "{\"n\":1,\"max_tokens\":1024}";
+         std::string generation_cfg_json_str = "{\"n\":1,\"temperature\":0.6,\"top_p\":0.9,\"frequency_penalty\":0,\"presence_penalty\":0,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":null,\"stop_token_ids\":[128001, 128008, 128009],\"response_format\":null,\"debug_config\":null}";
          auto additions_generation_config = json::ParseToJSONObject(generation_cfg_json_str);
-
-
          auto combined_config_res = GenerationConfig::FromJSON(additions_generation_config, this->_generation_config);
          GenerationConfig g_config = combined_config_res.Unwrap();
-
-
          Request req = Request(std::move(req_id), std::move(inputs), g_config);
 
          GetEngine()->AddRequest(req);
