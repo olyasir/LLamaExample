@@ -38,7 +38,6 @@ private:
     std::unique_ptr<Engine> _engine = nullptr;
     GenerationConfig _generation_config;
     Tokenizer tokenizer;
-    TextStreamer streamer;
     std::string _model_path;
    
 

@@ -1,7 +1,7 @@
 #include  "include/llama_model.h"
 
 int main() {
-    bool use_tiny_llama = false;
+    bool use_tiny_llama = true;
     std::string generation_cfg_json_str;
     std::string model_path;
     std::string model_lib_path;
@@ -20,22 +20,33 @@ int main() {
     
     LlamaModel model = LlamaModel(model_path, model_lib_path, generation_cfg_json_str);
 
-    std::string tiny_llama_input = R"(Message: <|system|>
-You are a helpful chatbot.</s><|user|>
-what is a capital of France?</s><|assistant|>
+    while (true)
+    {
 
-)";
-    
-    std::string input = R"(<|start_header_id|>system<|end_header_id|>
+        std::string prompt ;
+        std:: cout << "Enter prompt or 'exit' to finish.\n >>"; 
+        getline(std::cin, prompt);
+        std::cout<< "The prompt is : "<<prompt<<"\n";
+        if (prompt == "exit")
+            break;
 
-You are a helpful, respectful and honest assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+        std::string tiny_llama_input = R"(Message: <|system|>
+        You are a helpful chatbot.</s><|user|>
+        )"+ prompt + R"(</s><|assistant|>
 
-hello<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+        )";
+            
+        std::string input = R"(<|start_header_id|>system<|end_header_id|>
+
+        You are a helpful, respectful and honest assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+        )" +prompt+R"(<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
 
-)";
+        )";
 
-    std::string out = model.Process(use_tiny_llama ? tiny_llama_input : input);
-    std::cout << out << "\n";
+        std::string out = model.Process(use_tiny_llama ? tiny_llama_input : input);
+        std::cout << out << "\n";
+    }
     return 0;
 }

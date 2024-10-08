@@ -42,7 +42,7 @@ std::string  get_engine_config(String model_path, String model_lib)
      std::string engine_config = get_engine_config(model_path, model_lib);
      tokenizer = Tokenizer::FromPath(model_path);
      log(logDEBUG) << "Loaded Tokenizer..\n";
-     streamer = TextStreamer(tokenizer);
+     
      log(logDEBUG) << "Started Engine Creation..\n";
      Result<EngineCreationOutput> output_res = Engine::Create(
          engine_config, tvm::Device{ static_cast<DLDeviceType>(kDLVulkan), 0 },
@@ -70,6 +70,7 @@ std::string  get_engine_config(String model_path, String model_lib)
          int num_total_generations = 1;
          std::string output_texts;
          bool finished_generation = false;
+         TextStreamer streamer = TextStreamer(tokenizer);
          auto lambda = [&](Array<RequestStreamOutput> out) {
              for (const auto& delta_output : out) {
                  std::string request_id = delta_output->request_id;
