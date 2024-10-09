@@ -16,23 +16,39 @@
 using namespace mlc::llm;
 using namespace mlc::llm::serve;
 
-loglevel_e loglevel = logDEBUG;
+loglevel_e loglevel = logINFO;
 
 void  callback_func(Array<RequestStreamOutput> out){}
 
 std::string  get_engine_config(String model_path, String model_lib)
 {
-    std::string engine_config = "{\"model\" : \"" + model_path+"\"";
-    engine_config = engine_config+ ", \"model_lib\" : \""+model_lib+"\"";
-    engine_config += ", \"additional_models\" : [] , \"mode\" : \"interactive\", \"tensor_parallel_shards\" : null,\
-                        \"pipeline_parallel_stages\" : null, \"gpu_memory_utilization\" : null,\
-                         \"kv_cache_page_size\" : 16, \"max_num_sequence\" : null, \"max_total_sequence_length\" : null,\
-                         \"max_single_sequence_length\" : null, \"prefill_chunk_size\" : null, \"sliding_window_size\" : null,\
-                         \"attention_sink_size\" : null, \"max_history_size\" : null, \"kv_state_kind\" : null,\
-                         \"speculative_mode\" : \"disable\", \"spec_draft_length\" : 0, \"spec_tree_width\" : 1,\
-                         \"prefix_cache_mode\" : \"radix\", \"prefix_cache_max_num_recycling_seqs\" : null,\
-                         \"prefill_mode\" : \"hybrid\", \"verbose\" : false}";
-    return engine_config;
+    picojson::object config;
+
+    config["model"] = picojson::value(model_path);
+    config["model_lib"] = picojson::value(model_lib);
+    config["additional_models"] = picojson::value(picojson::array());
+    config["mode"] = picojson::value("interactive");
+    config["tensor_parallel_shards"] = picojson::value();
+    config["pipeline_parallel_stages"] = picojson::value();
+    config["gpu_memory_utilization"] = picojson::value();
+    config["kv_cache_page_size"] = picojson::value(static_cast<double>(16));
+    config["max_num_sequence"] = picojson::value();
+    config["max_total_sequence_length"] = picojson::value();
+    config["max_single_sequence_length"] = picojson::value();
+    config["prefill_chunk_size"] = picojson::value();
+    config["sliding_window_size"] = picojson::value();
+    config["attention_sink_size"] = picojson::value();
+    config["max_history_size"] = picojson::value();
+    config["kv_state_kind"] = picojson::value();
+    config["speculative_mode"] = picojson::value("disable");
+    config["spec_draft_length"] = picojson::value(static_cast<double>(0));
+    config["spec_tree_width"] = picojson::value(static_cast<double>(1));
+    config["prefix_cache_mode"] = picojson::value("radix");
+    config["prefix_cache_max_num_recycling_seqs"] = picojson::value();
+    config["prefill_mode"] = picojson::value("hybrid");
+    config["verbose"] = picojson::value(false);
+
+    return picojson::value(config).serialize();
 }
 
 
@@ -65,9 +81,6 @@ std::string  get_engine_config(String model_path, String model_lib)
  // Generate texts based on input prompts
  std::string LlamaModel::Process(const std::string prompt) {
         log(logDEBUG) << "Start Processing prompt"<<prompt<<"\n";
-         //std::vector<std::optional<std::vector<std::vector<std::string>>>> output_logprobs_str(prompts.size());
-         size_t num_finished_generations = 0;
-         int num_total_generations = 1;
          std::string output_texts;
          bool finished_generation = false;
          TextStreamer streamer = TextStreamer(tokenizer);

@@ -62,6 +62,7 @@ set(LIB_SOURCES include/llama_model.h
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCES})
 add_executable(cli example.cc)
+add_executable(cli_tool tool_example.cc)
 
 #link_directories([AFTER|BEFORE] directory1 [directory2 ...])
 # Link libraries
@@ -81,13 +82,14 @@ target_include_directories(cli PRIVATE ${PROJECT_SOURCE_DIR}
                                         ${TVM_INCLUDES}
                                         ${TOKENIZERS_INCLUDES})
 
-#target_include_directories(${LIB_NAME} PRIVATE 
-#    ${CMAKE_CURRENT_SOURCE_DIR}/mlc-llm/include
-#    ${CMAKE_CURRENT_BINARY_DIR}/mlc-llm
-#     ${CMAKE_CURRENT_BINARY_DIR}
-#)
+target_include_directories(cli_tool PRIVATE ${PROJECT_SOURCE_DIR} 
+                                        ${MLC_LLM_HOME}
+                                        ${TVM_INCLUDES}
+                                        ${TOKENIZERS_INCLUDES})
+
 
 # Include directories
 target_link_libraries(${LIB_NAME} PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,mlc_llm_static,tvm_runtime,tokenizers_cpp>")
 target_link_libraries(cli PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${LIB_NAME}>")
+target_link_libraries(cli_tool PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${LIB_NAME}>")
 
