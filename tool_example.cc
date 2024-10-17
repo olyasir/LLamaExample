@@ -115,11 +115,18 @@ int main() {
     std::string generation_cfg_json_str;
     std::string model_path;
     std::string model_lib_path;
+    int weight_files_num = 131;
     generation_cfg_json_str = get_generation_config();
+    tvm::Device device = tvm::Device{ static_cast<DLDeviceType>(kDLVulkan), 0 };
     model_path = "/home/ubuntu/compiled_models/Meta-Llama-3.1-8B-Instruct";
     model_lib_path = "/home/ubuntu/compiled_models/libs/Meta-Llama-3.1-8B-Instruct-vulkan.so";
     
-    LlamaModel model = LlamaModel(model_path, model_lib_path, generation_cfg_json_str);
+    LlamaModel model = LlamaModel(model_path, model_lib_path, generation_cfg_json_str, device);
+    for (int i=0;i<weight_files_num; i++)
+    {
+        std::string file_name = std::string("params_shard_").append(std::to_string(i)).append(".bin");
+        model.LoadWeights(file_name);
+    }
     std::string out = model.Process(prompt_with_tool);
     std::cout << out << "\n";
     //expecting to get function call for weather in paris

@@ -58,7 +58,12 @@ set(TOKENIZERS_INCLUDES ${MLC_LLM_HOME}/3rdparty/tokenizers-cpp/include)
 
 set(LIB_NAME llama_model_base)
 set(LIB_SOURCES include/llama_model.h
-                src/llama_model.cc)
+                include/llama_engine.h
+                include/engine_with_load.h
+                include/utils.h
+                src/llama_model.cc
+                src/utils.cc
+                src/llama_engine.cc)
 
 add_library(${LIB_NAME} STATIC ${LIB_SOURCES})
 add_executable(cli example.cc)

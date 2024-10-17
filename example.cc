@@ -41,19 +41,28 @@ int main() {
     std::string model_path;
     std::string model_lib_path;
 
+    tvm::Device device = tvm::Device{ static_cast<DLDeviceType>(kDLVulkan), 0 };
+
     std::string generation_cfg_json_str = get_generation_config(use_tiny_llama);
+    int weight_files_num;
     if(use_tiny_llama){
-        //generation_cfg_json_str = "{\"n\":1,\"temperature\":1.0,\"top_p\":1.0,\"frequency_penalty\":0,\"presence_penalty\":0,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":[\"</s>\"],\"stop_token_ids\":[2],\"response_format\":null,\"debug_config\":null}";
         model_path = "/home/ubuntu/compiled_models/TinyLlama-1.1B-Chat-v1.0";
         model_lib_path = "/home/ubuntu/compiled_models/libs/TinyLlama-1.1B-Chat-v1.0-vulkan.so";
+        weight_files_num = 58;
 
     }else{
-        //generation_cfg_json_str = "{\"n\":1,\"temperature\":0.6,\"top_p\":0.9,\"frequency_penalty\":0,\"presence_penalty\":0,\"repetition_penalty\":null,\"logprobs\":false,\"top_logprobs\":0,\"logit_bias\":null,\"max_tokens\":1024,\"seed\":null,\"stop_strs\":null,\"stop_token_ids\":[128001, 128008, 128009],\"response_format\":null,\"debug_config\":null}"; 
         model_path = "/home/ubuntu/compiled_models/Meta-Llama-3.1-8B-Instruct";
         model_lib_path = "/home/ubuntu/compiled_models/libs/Meta-Llama-3.1-8B-Instruct-vulkan.so";
+        weight_files_num = 131;
     }
     
-    LlamaModel model = LlamaModel(model_path, model_lib_path, generation_cfg_json_str);
+    LlamaModel model = LlamaModel(model_path, model_lib_path, generation_cfg_json_str, device);
+    for (int i=0;i<weight_files_num; i++)
+    {
+        std::string file_name = std::string("params_shard_").append(std::to_string(i)).append(".bin");
+        model.LoadWeights(file_name);
+    }
+
 
     while (true)
     {
@@ -81,6 +90,8 @@ int main() {
 
         std::string out = model.Process(use_tiny_llama ? tiny_llama_input : input);
         std::cout << out << "\n";
+
+        std::cout<< model.Metrics()<<"\n";
     }
     return 0;
 }

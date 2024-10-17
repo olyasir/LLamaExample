@@ -1,22 +1,12 @@
 #include "../include/llama_model.h"
-#include "../include/logging.h"
-#include<cpp/serve/model.h>
-#include <vector>
-#include <cpp/serve/data.h>
-#include <cpp/support/result.h>
-#include <cpp/support/json_parser.h>
-#include <cpp/tokenizers/tokenizers.h>
-#include <cpp/tokenizers/streamer.h>
-#include <picojson.h>
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <tvm/runtime/container/string.h>
+
+
 
 using namespace mlc::llm;
 using namespace mlc::llm::serve;
 
-loglevel_e loglevel = logINFO;
+loglevel_e loglevel = logDEBUG;
+class LlamaEngineImpl;
 
 void  callback_func(Array<RequestStreamOutput> out){}
 
@@ -52,7 +42,8 @@ std::string  get_engine_config(String model_path, String model_lib)
 }
 
 
- LlamaModel::LlamaModel(String model_path, String model_lib, std::string generation_config_str ) {
+ LlamaModel::LlamaModel(String model_path, String model_lib, 
+                        std::string generation_config_str, tvm::Device device ) {
      log(logDEBUG) << "Model Path "    << model_path << " \n";
      log(logDEBUG) << "model_lib "    << model_lib << " \n";
      std::string engine_config = get_engine_config(model_path, model_lib);
@@ -60,26 +51,117 @@ std::string  get_engine_config(String model_path, String model_lib)
      log(logDEBUG) << "Loaded Tokenizer..\n";
      
      log(logDEBUG) << "Started Engine Creation..\n";
-     Result<EngineCreationOutput> output_res = Engine::Create(
-         engine_config, tvm::Device{ static_cast<DLDeviceType>(kDLVulkan), 0 },
+     Result<LLamaEngineCreationOutput> output_res = LlamaEngine::Create(
+         engine_config, device,
          callback_func, {});
      log(logDEBUG) << "Finished Engine creation..\n";
-     EngineCreationOutput output = output_res.Unwrap(); 
+     LLamaEngineCreationOutput output = output_res.Unwrap(); 
      GenerationConfig default_generation_config  = output.default_generation_cfg;
      auto additions_generation_config = json::ParseToJSONObject(generation_config_str);
      auto combined_config_res = GenerationConfig::FromJSON(additions_generation_config, default_generation_config);
     _generation_config = combined_config_res.Unwrap();
      _engine = std::move(output.reloaded_engine);   
      _model_path = model_path;
-     log(logDEBUG) << "Finished model initialization\n";
+     _device = device;
+     _loaded_weight_num = 0;
+    // _model_metadata  = output.model_metadata;
+
+     std::filesystem::path fs_model_path = _model_path;
+
+     std::string metadata_path = (fs_model_path / "ndarray-cache.json").string();
+
+      std::string ndarray_cache_json = get_file_contents(metadata_path);
+      ndarray_cache_metadata_ = NDArrayCacheMetadata::LoadFromStr(
+      ndarray_cache_json,
+      ""
+    );
+    _required_weight_num = ndarray_cache_metadata_.records.size();
+     log(logDEBUG) << "Finished model configuration initialization\n";
+     _initialized = false;
  }
 
+
+
+ void UpdateNDArrayCache(
+                          const NDArrayCacheMetadata& ndarray_cache_metadata,
+                          const std::string& filename,
+                          std::vector<uint8_t> weight_data,
+                          bool use_presharded_weights,
+                           Device device) {
+    using tvm::runtime::ShapeTuple;
+    using FileRecord = NDArrayCacheMetadata::FileRecord;
+    using ParamRecord = FileRecord::ParamRecord;
+
+    const size_t filename_chars = std::string("params_shard_").size();
+    size_t stop_idx = filename.find_last_of('.');
+    std::string remaining = filename.substr(filename_chars, stop_idx - filename_chars);
+    size_t file_record_idx = std::stoi(remaining);
+    const FileRecord& file_record = ndarray_cache_metadata.records[file_record_idx];
+    size_t total_param_records = file_record.records.size();
+    Array<NDArray> params;
+    const auto& params_shard_file = weight_data;
+    const std::string raw_data_buffer { params_shard_file.begin(), params_shard_file.end() };
+    Optional<NDArray> staging_buffer;
+
+    CHECK(!use_presharded_weights) << "Use of pre-sharded weights requires more than one GPU";
+    std::cerr << filename << " has these many parameter records: " << total_param_records << '\n';
+
+    params.reserve(total_param_records);
+
+    for (size_t i = 0; i < total_param_records; ++i) {
+      const ParamRecord& param_record = file_record.records[i];
+
+      params.push_back(param_record.Load(device,
+                                         &raw_data_buffer,
+                                         &staging_buffer));
+    }
+
+    const PackedFunc* fload_cache_update = tvm::runtime::Registry::Get("vm.builtin.ndarray_cache.update");
+    ICHECK(fload_cache_update) << "TVM runtime cannot find vm.builtin.ndarray_cache.update";
+
+    /* Update the global cache with all the various parameters */
+    for (size_t i = 0; i < params.size(); ++i)
+      (*fload_cache_update)(file_record.records[i].name, params[i], true);
+  }
+
+
+
  bool LlamaModel::LoadWeights(const std::string& weights_file) {
+    //TODO check if file was not already loaded
+    log(logDEBUG) << "Adding weights" << weights_file <<"\n";
+    std::string full_path = std::string("").append(_model_path).append("/"+weights_file);
+    std::vector<uint8_t> weight_data = get_bytes_from_file(full_path);
+
+    UpdateNDArrayCache(ndarray_cache_metadata_, weights_file, weight_data, false, _device);
+
+    //load file to cache
+    _loaded_weight_num++;
+    if (_loaded_weight_num == _required_weight_num)
+    {
+        log(logDEBUG) << "Loaded all weights starting to load parameters \n";
+         _initialized = true;
+         LoadParams();
+        //load params from cache
+    }
+
      return true;
  }
 
+
+
+void   LlamaModel::LoadParams() {
+    GetEngine()->LoadParams();
+  }
+
+std::string LlamaModel::Metrics(){
+    return GetEngine()->JSONMetrics();
+}
+
  // Generate texts based on input prompts
  std::string LlamaModel::Process(const std::string prompt) {
+        if ( !_initialized){
+            return "Cannot generate response. Please load model weights\n";
+        }
         log(logDEBUG) << "Start Processing prompt"<<prompt<<"\n";
          std::string output_texts;
          bool finished_generation = false;
